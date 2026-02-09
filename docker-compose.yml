@@ -1,0 +1,28 @@
+# https://docs.docker.com/compose/compose-file/
+
+services:
+  python:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.python
+    volumes:
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./uv.lock:/app/uv.lock
+
+  fastapi_app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.python
+      args:
+        UV_SYNC_OPTIONS: "--group fastapi"
+    command: ["fastapi", "dev", "fastapi_app/main.py", "--host", "0.0.0.0"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src/fastapi_app:/app/fastapi_app
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./uv.lock:/app/uv.lock
+
+
+
+
