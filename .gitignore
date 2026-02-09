@@ -1,5 +1,8 @@
 # https://git-scm.com/docs/gitignore
 
+# Claude
+.claude/
+
 # Build
 /dist/
 /build/
