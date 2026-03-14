@@ -76,6 +76,19 @@ class TestFasterWhisperTranscriber:
 
         mock_model.transcribe.assert_called_once_with(str(audio_file), beam_size=5)
 
+    def test_load_model_wraps_exception_in_transcription_error(self) -> None:
+        """Test that load_model wraps library exceptions in TranscriptionError."""
+        from proto_transcription.exceptions import TranscriptionError
+
+        transcriber = FasterWhisperTranscriber("base")
+
+        with patch(
+            "proto_transcription.transcription.faster_whisper.WhisperModel",
+            side_effect=RuntimeError("download failed"),
+        ):
+            with pytest.raises(TranscriptionError, match="download failed"):
+                transcriber.load_model()
+
     def test_transcribe_wraps_exception_in_transcription_error(self, tmp_path: Path) -> None:
         """Test that library exceptions are wrapped in TranscriptionError."""
         from proto_transcription.exceptions import TranscriptionError
