@@ -1,12 +1,18 @@
 """Configuration for the tests."""
 
+import sys
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from proto_transcription.transcription.base import BaseTranscriber
+# Stub out uninstalled optional heavy dependencies so test collection succeeds
+# without requiring the actual libraries to be installed.
+_faster_whisper_stub = MagicMock()
+sys.modules.setdefault("faster_whisper", _faster_whisper_stub)
+
+from proto_transcription.transcription.base import BaseTranscriber  # noqa: E402
 
 
 @pytest.fixture

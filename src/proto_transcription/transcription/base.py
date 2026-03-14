@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any
 
 
 class BaseTranscriber(ABC):
@@ -22,7 +23,7 @@ class BaseTranscriber(ABC):
             model_size: Model size (tiny, base, small, medium, large).
         """
         self.model_size = model_size
-        self.model = None
+        self.model: Any = None
 
     @property
     @abstractmethod

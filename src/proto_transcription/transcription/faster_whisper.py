@@ -8,8 +8,10 @@ Reference: https://github.com/guillaumekln/faster-whisper
 
 from pathlib import Path
 
+from faster_whisper import WhisperModel
 from loguru import logger
 
+from proto_transcription.exceptions import TranscriptionError
 from proto_transcription.transcription.base import BaseTranscriber
 
 
@@ -45,20 +47,18 @@ class FasterWhisperTranscriber(BaseTranscriber):
         """Load Faster Whisper model.
 
         Downloads model on first use (~140MB for base model).
-        Subsequent runs use cached model.
-
-        TODO: Implement model loading
-        - Import faster_whisper.WhisperModel
-        - Load model with self.model_size
-        - Store in self.model
-        - Log successful load
+        Subsequent runs use cached model. Uses CPU with int8 quantization,
+        which is optimal for Apple Silicon (CTranslate2 does not support MPS).
 
         Raises:
             TranscriptionError: If model loading fails.
         """
         logger.info(f"Loading Faster Whisper {self.model_size} model")
-        # TODO: Implement
-        raise NotImplementedError("FasterWhisperTranscriber.load_model() not yet implemented")
+        try:
+            self.model = WhisperModel(self.model_size, device="cpu", compute_type="int8")
+            logger.info("Faster Whisper model loaded successfully")
+        except Exception as e:
+            raise TranscriptionError(f"Failed to load Faster Whisper model: {e}") from e
 
     def transcribe(self, audio_file: Path) -> tuple[str, list[dict]]:
         """Transcribe audio using Faster Whisper.
@@ -71,15 +71,19 @@ class FasterWhisperTranscriber(BaseTranscriber):
             - formatted_text: Transcription with [HH:MM:SS] timestamps
             - segments: List of dicts with start, end, text keys
 
-        TODO: Implement transcription
-        - Call self.model.transcribe(str(audio_file))
-        - Extract segments from result
-        - Format with timestamps using self.format_segments()
-        - Log and return results
-
         Raises:
             TranscriptionError: If transcription fails.
         """
         logger.info(f"Transcribing {audio_file.name} with Faster Whisper")
-        # TODO: Implement
-        raise NotImplementedError("FasterWhisperTranscriber.transcribe() not yet implemented")
+        try:
+            segments_gen, info = self.model.transcribe(str(audio_file), beam_size=5)
+            logger.debug(f"Detected language: {info.language} ({info.language_probability})")
+
+            segments = [
+                {"start": seg.start, "end": seg.end, "text": seg.text} for seg in segments_gen
+            ]
+            formatted = self.format_segments(segments)
+            logger.info(f"Transcription complete: {len(segments)} segments")
+            return formatted, segments
+        except Exception as e:
+            raise TranscriptionError(f"Faster Whisper transcription failed: {e}") from e
