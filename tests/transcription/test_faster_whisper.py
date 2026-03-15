@@ -103,3 +103,14 @@ class TestFasterWhisperTranscriber:
 
         with pytest.raises(TranscriptionError, match="model failed"):
             transcriber.transcribe(audio_file)
+
+    def test_transcribe_raises_if_model_not_loaded(self, tmp_path: Path) -> None:
+        """Test transcribe raises TranscriptionError if load_model() was not called."""
+        from proto_transcription.exceptions import TranscriptionError
+
+        transcriber = FasterWhisperTranscriber("base")
+        audio_file = tmp_path / "audio.wav"
+        audio_file.touch()
+
+        with pytest.raises(TranscriptionError, match="Model not loaded"):
+            transcriber.transcribe(audio_file)

@@ -60,6 +60,7 @@ class TestTransformersTranscriber:
                 model="openai/whisper-small",
                 device="cpu",
             )
+            assert transcriber.model is mock_pipe
 
     def test_transcribe_returns_formatted_text_and_segments(self, tmp_path: Path) -> None:
         """Test transcribe parses HuggingFace chunks into standard segment format."""
@@ -132,3 +133,14 @@ class TestTransformersTranscriber:
             mock_torch.backends.mps.is_available.return_value = False
             with pytest.raises(TranscriptionError, match="download failed"):
                 transcriber.load_model()
+
+    def test_transcribe_raises_if_model_not_loaded(self, tmp_path: Path) -> None:
+        """Test transcribe raises TranscriptionError if load_model() was not called."""
+        from proto_transcription.exceptions import TranscriptionError
+
+        transcriber = TransformersTranscriber("base")
+        audio_file = tmp_path / "audio.wav"
+        audio_file.touch()
+
+        with pytest.raises(TranscriptionError, match="Model not loaded"):
+            transcriber.transcribe(audio_file)

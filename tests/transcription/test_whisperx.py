@@ -136,6 +136,17 @@ class TestWhisperXTranscriber:
 
         mock_model.transcribe.assert_called_once_with(mock_audio, batch_size=16)
 
+    def test_transcribe_raises_if_model_not_loaded(self, tmp_path: Path) -> None:
+        """Test transcribe raises TranscriptionError if load_model() was not called."""
+        from proto_transcription.exceptions import TranscriptionError
+
+        transcriber = WhisperXTranscriber("base")
+        audio_file = tmp_path / "audio.wav"
+        audio_file.touch()
+
+        with pytest.raises(TranscriptionError, match="Model not loaded"):
+            transcriber.transcribe(audio_file)
+
     def test_transcribe_calls_alignment_with_correct_args(self, tmp_path: Path) -> None:
         """Test alignment calls use correct device and return_char_alignments=False."""
         transcriber = WhisperXTranscriber("base")

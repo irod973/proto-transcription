@@ -80,6 +80,8 @@ class WhisperXTranscriber(BaseTranscriber):
         """
         logger.info(f"Transcribing {audio_file.name} with WhisperX")
         try:
+            if self.model is None:
+                raise TranscriptionError("Model not loaded. Call load_model() first.")
             audio = whisperx.load_audio(str(audio_file))
             result = self.model.transcribe(audio, batch_size=16)
             logger.debug(f"Detected language: {result['language']}")
