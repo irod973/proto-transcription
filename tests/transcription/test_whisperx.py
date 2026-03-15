@@ -115,3 +115,55 @@ class TestWhisperXTranscriber:
             mock_wx.load_model.side_effect = RuntimeError("download failed")
             with pytest.raises(TranscriptionError, match="download failed"):
                 transcriber.load_model()
+
+    def test_transcribe_calls_model_with_correct_args(self, tmp_path: Path) -> None:
+        """Test transcribe calls model.transcribe with audio and batch_size."""
+        transcriber = WhisperXTranscriber("base")
+        audio_file = tmp_path / "audio.wav"
+        audio_file.touch()
+
+        mock_audio = MagicMock()
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = {"segments": [], "language": "en"}
+        transcriber.model = mock_model
+
+        with patch("proto_transcription.transcription.whisperx.whisperx") as mock_wx:
+            mock_wx.load_audio.return_value = mock_audio
+            mock_wx.load_align_model.return_value = (MagicMock(), MagicMock())
+            mock_wx.align.return_value = {"segments": []}
+
+            transcriber.transcribe(audio_file)
+
+        mock_model.transcribe.assert_called_once_with(mock_audio, batch_size=16)
+
+    def test_transcribe_calls_alignment_with_correct_args(self, tmp_path: Path) -> None:
+        """Test alignment calls use correct device and return_char_alignments=False."""
+        transcriber = WhisperXTranscriber("base")
+        audio_file = tmp_path / "audio.wav"
+        audio_file.touch()
+
+        mock_audio = MagicMock()
+        mock_model = MagicMock()
+        mock_segments = [{"start": 0.0, "end": 1.0, "text": "hi"}]
+        mock_model.transcribe.return_value = {"segments": mock_segments, "language": "en"}
+        transcriber.model = mock_model
+
+        mock_align_model = MagicMock()
+        mock_metadata = MagicMock()
+
+        with patch("proto_transcription.transcription.whisperx.whisperx") as mock_wx:
+            mock_wx.load_audio.return_value = mock_audio
+            mock_wx.load_align_model.return_value = (mock_align_model, mock_metadata)
+            mock_wx.align.return_value = {"segments": mock_segments}
+
+            transcriber.transcribe(audio_file)
+
+        mock_wx.load_align_model.assert_called_once_with(language_code="en", device="cpu")
+        mock_wx.align.assert_called_once_with(
+            mock_segments,
+            mock_align_model,
+            mock_metadata,
+            mock_audio,
+            "cpu",
+            return_char_alignments=False,
+        )
