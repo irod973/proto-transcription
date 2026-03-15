@@ -1,23 +1,26 @@
 """WhisperX transcriber implementation with alignment.
 
-Uses the whisperx library which adds speaker diarization and more accurate
-timing alignment compared to base Whisper.
+Uses the whisperx library which adds more accurate word-level timing alignment
+compared to base Whisper.
 
 Reference: https://github.com/m-bain/whisperx
 """
 
 from pathlib import Path
 
+import whisperx
 from loguru import logger
 
+from proto_transcription.exceptions import TranscriptionError
 from proto_transcription.transcription.base import BaseTranscriber
 
 
 class WhisperXTranscriber(BaseTranscriber):
-    """Transcriber using WhisperX with alignment and diarization.
+    """Transcriber using WhisperX with alignment.
 
-    Provides aligned transcriptions with speaker diarization capabilities.
-    Models are automatically downloaded on first use.
+    Provides aligned transcriptions with accurate word-level timestamps.
+    Models are automatically downloaded on first use. Uses CPU (MPS support
+    in WhisperX is limited).
 
     Attributes:
         model_size: Size of model (tiny, base, small, medium, large).
@@ -45,24 +48,24 @@ class WhisperXTranscriber(BaseTranscriber):
         """Load WhisperX model.
 
         Downloads model on first use (~140MB for base model).
-        Subsequent runs use cached model.
-
-        TODO: Implement model loading
-        - Import whisperx
-        - Load model with whisperx.load_model()
-        - Use self.model_size and device
-        - Store in self.model
-        - Log successful load
+        Subsequent runs use cached model. Uses CPU with int8 quantization
+        (WhisperX has limited MPS support).
 
         Raises:
             TranscriptionError: If model loading fails.
         """
         logger.info(f"Loading WhisperX {self.model_size} model")
-        # TODO: Implement
-        raise NotImplementedError("WhisperXTranscriber.load_model() not yet implemented")
+        try:
+            self.model = whisperx.load_model(self.model_size, device="cpu", compute_type="int8")
+            logger.info("WhisperX model loaded successfully")
+        except Exception as e:
+            raise TranscriptionError(f"Failed to load WhisperX model: {e}") from e
 
     def transcribe(self, audio_file: Path) -> tuple[str, list[dict]]:
-        """Transcribe audio using WhisperX.
+        """Transcribe audio using WhisperX with alignment.
+
+        Runs transcription then applies forced phoneme alignment for more
+        accurate word-level timestamps.
 
         Args:
             audio_file: Path to WAV/MP3 audio file.
@@ -70,17 +73,35 @@ class WhisperXTranscriber(BaseTranscriber):
         Returns:
             Tuple of (formatted_text, segments) where:
             - formatted_text: Transcription with [HH:MM:SS] timestamps
-            - segments: List of dicts with start, end, text keys
-
-        TODO: Implement transcription
-        - Call self.model.transcribe(str(audio_file))
-        - Extract and align segments
-        - Format with timestamps using self.format_segments()
-        - Log and return results
+            - segments: List of dicts with start, end, text keys (from aligned result)
 
         Raises:
-            TranscriptionError: If transcription fails.
+            TranscriptionError: If transcription or alignment fails.
         """
         logger.info(f"Transcribing {audio_file.name} with WhisperX")
-        # TODO: Implement
-        raise NotImplementedError("WhisperXTranscriber.transcribe() not yet implemented")
+        try:
+            audio = whisperx.load_audio(str(audio_file))
+            result = self.model.transcribe(audio, batch_size=16)
+            logger.debug(f"Detected language: {result['language']}")
+
+            model_a, metadata = whisperx.load_align_model(
+                language_code=result["language"], device="cpu"
+            )
+            aligned = whisperx.align(
+                result["segments"],
+                model_a,
+                metadata,
+                audio,
+                "cpu",
+                return_char_alignments=False,
+            )
+
+            segments = [
+                {"start": seg["start"], "end": seg["end"], "text": seg["text"]}
+                for seg in aligned["segments"]
+            ]
+            formatted = self.format_segments(segments)
+            logger.info(f"Transcription complete: {len(segments)} segments")
+            return formatted, segments
+        except Exception as e:
+            raise TranscriptionError(f"WhisperX transcription failed: {e}") from e

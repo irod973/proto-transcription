@@ -12,6 +12,9 @@ import pytest
 _faster_whisper_stub = MagicMock()
 sys.modules.setdefault("faster_whisper", _faster_whisper_stub)
 
+_whisperx_stub = MagicMock()
+sys.modules.setdefault("whisperx", _whisperx_stub)
+
 from proto_transcription.transcription.base import BaseTranscriber  # noqa: E402
 
 
