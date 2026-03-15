@@ -142,5 +142,7 @@ class TestTransformersTranscriber:
         audio_file = tmp_path / "audio.wav"
         audio_file.touch()
 
-        with pytest.raises(TranscriptionError, match="Model not loaded"):
+        with pytest.raises(
+            TranscriptionError, match="Model not loaded. Call load_model\\(\\) first\\."
+        ):
             transcriber.transcribe(audio_file)

@@ -144,7 +144,9 @@ class TestWhisperXTranscriber:
         audio_file = tmp_path / "audio.wav"
         audio_file.touch()
 
-        with pytest.raises(TranscriptionError, match="Model not loaded"):
+        with pytest.raises(
+            TranscriptionError, match="Model not loaded. Call load_model\\(\\) first\\."
+        ):
             transcriber.transcribe(audio_file)
 
     def test_transcribe_calls_alignment_with_correct_args(self, tmp_path: Path) -> None:

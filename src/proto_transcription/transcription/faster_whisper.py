@@ -74,12 +74,12 @@ class FasterWhisperTranscriber(BaseTranscriber):
         Raises:
             TranscriptionError: If transcription fails.
         """
+        if self.model is None:
+            raise TranscriptionError("Model not loaded. Call load_model() first.")
         logger.info(f"Transcribing {audio_file.name} with Faster Whisper")
         try:
-            if self.model is None:
-                raise TranscriptionError("Model not loaded. Call load_model() first.")
             segments_gen, info = self.model.transcribe(str(audio_file), beam_size=5)
-            logger.debug(f"Detected language: {info.language} ({info.language_probability})")
+            logger.debug(f"Detected language: {info.language} ({info.language_probability:.2f})")
 
             segments = [
                 {"start": seg.start, "end": seg.end, "text": seg.text} for seg in segments_gen

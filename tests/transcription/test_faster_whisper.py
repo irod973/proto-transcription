@@ -47,8 +47,10 @@ class TestFasterWhisperTranscriber:
         seg2.end = 5.0
         seg2.text = " Goodbye world"
 
+        mock_info = MagicMock()
+        mock_info.language_probability = 0.99
         mock_model = MagicMock()
-        mock_model.transcribe.return_value = (iter([seg1, seg2]), MagicMock())
+        mock_model.transcribe.return_value = (iter([seg1, seg2]), mock_info)
         transcriber.model = mock_model
 
         text, segments = transcriber.transcribe(audio_file)
@@ -68,8 +70,10 @@ class TestFasterWhisperTranscriber:
         audio_file = tmp_path / "audio.wav"
         audio_file.touch()
 
+        mock_info = MagicMock()
+        mock_info.language_probability = 0.99
         mock_model = MagicMock()
-        mock_model.transcribe.return_value = (iter([]), MagicMock())
+        mock_model.transcribe.return_value = (iter([]), mock_info)
         transcriber.model = mock_model
 
         transcriber.transcribe(audio_file)
@@ -112,5 +116,7 @@ class TestFasterWhisperTranscriber:
         audio_file = tmp_path / "audio.wav"
         audio_file.touch()
 
-        with pytest.raises(TranscriptionError, match="Model not loaded"):
+        with pytest.raises(
+            TranscriptionError, match="Model not loaded. Call load_model\\(\\) first\\."
+        ):
             transcriber.transcribe(audio_file)

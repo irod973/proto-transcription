@@ -82,10 +82,10 @@ class TransformersTranscriber(BaseTranscriber):
         Raises:
             TranscriptionError: If transcription fails.
         """
+        if self.model is None:
+            raise TranscriptionError("Model not loaded. Call load_model() first.")
         logger.info(f"Transcribing {audio_file.name} with Transformers")
         try:
-            if self.model is None:
-                raise TranscriptionError("Model not loaded. Call load_model() first.")
             result = self.model(str(audio_file), return_timestamps=True)
             segments = [
                 {
