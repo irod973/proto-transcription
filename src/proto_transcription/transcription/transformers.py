@@ -8,8 +8,11 @@ Reference: https://huggingface.co/docs/transformers/tasks/asr
 
 from pathlib import Path
 
+import torch
 from loguru import logger
+from transformers import pipeline
 
+from proto_transcription.exceptions import TranscriptionError
 from proto_transcription.transcription.base import BaseTranscriber
 
 
@@ -17,7 +20,8 @@ class TransformersTranscriber(BaseTranscriber):
     """Transcriber using HuggingFace Transformers and OpenAI Whisper.
 
     Provides unified interface to Whisper via the popular Transformers library.
-    Models are automatically downloaded on first use.
+    Models are automatically downloaded on first use. Supports MPS acceleration
+    on Apple Silicon.
 
     Attributes:
         model_size: Size of model (tiny, base, small, medium, large).
@@ -42,25 +46,27 @@ class TransformersTranscriber(BaseTranscriber):
         return "transformers"
 
     def load_model(self) -> None:
-        """Load Transformers Whisper model.
+        """Load Transformers Whisper pipeline.
 
         Downloads model on first use (~140MB for base model).
-        Subsequent runs use cached model.
-
-        TODO: Implement model loading
-        - Import from transformers: pipeline, AutoModelForSpeechSeq2Seq
-        - Create or load processor and model
-        - Set device (cuda if available, else cpu)
-        - Create pipeline with model and processor
-        - Store in self.model
-        - Log successful load
+        Subsequent runs use cached model. Uses MPS on Apple Silicon,
+        falls back to CPU otherwise.
 
         Raises:
             TranscriptionError: If model loading fails.
         """
         logger.info(f"Loading Transformers {self.model_size} model")
-        # TODO: Implement
-        raise NotImplementedError("TransformersTranscriber.load_model() not yet implemented")
+        try:
+            device = "mps" if torch.backends.mps.is_available() else "cpu"
+            logger.debug(f"Using device: {device}")
+            self.model = pipeline(
+                task="automatic-speech-recognition",
+                model=f"openai/whisper-{self.model_size}",
+                device=device,
+            )
+            logger.info("Transformers model loaded successfully")
+        except Exception as e:
+            raise TranscriptionError(f"Failed to load Transformers model: {e}") from e
 
     def transcribe(self, audio_file: Path) -> tuple[str, list[dict]]:
         """Transcribe audio using Transformers pipeline.
@@ -73,18 +79,22 @@ class TransformersTranscriber(BaseTranscriber):
             - formatted_text: Transcription with [HH:MM:SS] timestamps
             - segments: List of dicts with start, end, text keys
 
-        TODO: Implement transcription
-        - Call self.model(str(audio_file))
-        - Extract segments from result["chunks"]
-        - Format with timestamps using self.format_segments()
-        - Log and return results
-
-        Note: May need to extract timing info from model output.
-        Transformers pipeline may provide different segment format.
-
         Raises:
             TranscriptionError: If transcription fails.
         """
         logger.info(f"Transcribing {audio_file.name} with Transformers")
-        # TODO: Implement
-        raise NotImplementedError("TransformersTranscriber.transcribe() not yet implemented")
+        try:
+            result = self.model(str(audio_file), return_timestamps=True)
+            segments = [
+                {
+                    "start": chunk["timestamp"][0],
+                    "end": chunk["timestamp"][1],
+                    "text": chunk["text"],
+                }
+                for chunk in result["chunks"]
+            ]
+            formatted = self.format_segments(segments)
+            logger.info(f"Transcription complete: {len(segments)} segments")
+            return formatted, segments
+        except Exception as e:
+            raise TranscriptionError(f"Transformers transcription failed: {e}") from e
