@@ -1,60 +1,115 @@
 # proto-transcription
 
 [![check.yml](https://github.com/irod973/proto-transcription/actions/workflows/check.yml/badge.svg)](https://github.com/irod973/proto-transcription/actions/workflows/check.yml)
-
 [![Documentation](https://img.shields.io/badge/documentation-available-brightgreen.svg)](https://irod973.github.io/proto-transcription/)
 [![License](https://img.shields.io/github/license/irod973/proto-transcription)](https://github.com/irod973/proto-transcription/blob/main/LICENCE.txt)
 [![Release](https://img.shields.io/github/v/release/irod973/proto-transcription)](https://github.com/irod973/proto-transcription/releases)
 
-# Description	
+## Description
 
-Transcribe audio content for personal notes..
+Transcribe audio files locally using three Whisper backends — [Faster Whisper](https://github.com/guillaumekln/faster-whisper), [WhisperX](https://github.com/m-bain/whisperx), and [HuggingFace Transformers](https://huggingface.co/docs/transformers/tasks/asr) — and compare their output side-by-side. Designed as a prototyping and evaluation harness for local speech-to-text.
 
-TODO: This README is generated from a cookiecutter template. Delete this comment and modify your README!
+## Installation
 
-# Installation
+**System dependency:** FFmpeg is required for audio conversion.
 
-Initialize your project with the provided `just` command.
-```shell
-# Install dependencies and pre-commit hooks	
-uv run just install	
-```
-# Usage
-
-TODO: Fill in with your project's details.
-
-
-
-
-## FastAPI
-
-This template includes an example FastAPI app and associated dependencies.
-
-Note that this runs `fastapi dev` which includes auto-reload by default. This should be switched to `fastapi run` in production.
-```shell
-# Invoke docker compose
-uv run just docker-compose fastapi_app
+```bash
+brew install ffmpeg
 ```
 
-## Development Features
+**Python dependencies:**
 
-* **Streamlined Project Structure:** A well-defined directory layout for source code, tests, documentation, tasks, and Docker configurations.
-Uv Integration: Effortless dependency management and packaging with [uv](https://docs.astral.sh/uv/).
-* **Automated Testing and Checks:** Pre-configured workflows using [Pytest](https://docs.pytest.org/), [Ruff](https://docs.astral.sh/ruff/), [Mypy](https://mypy.readthedocs.io/), [Bandit](https://bandit.readthedocs.io/), and [Coverage](https://coverage.readthedocs.io/) to ensure code quality, style, security, and type safety.
-* **Pre-commit Hooks:** Automatic code formatting and linting with [Ruff](https://docs.astral.sh/ruff/) and other pre-commit hooks to maintain consistency.
-* **Dockerized Deployment:** Dockerfile and docker-compose.yml for building and running the package within a containerized environment ([Docker](https://www.docker.com/)).
-* **uv+just Task Automation:** [just](https://github.com/casey/just) commands to simplify development workflows such as cleaning, installing, formatting, checking, building, documenting and running the project.
-* **Comprehensive Documentation:** [pdoc](https://pdoc.dev/) generates API documentation, and Markdown files provide clear usage instructions.
-* **GitHub Workflow Integration:** Continuous integration and deployment workflows are set up using [GitHub Actions](https://github.com/features/actions), automating testing, checks, and publishing.
+```bash
+# Install dev tools
+uv run just install
 
-Use the provided `just` commands to manage your development workflow:
+# Install ML inference libraries (torch, faster-whisper, whisperx, transformers)
+uv sync --group transcription
+```
 
-- `uv run just check`: Run code quality, type, security, and test checks.
-- `uv run just clean`: Clean up generated files.
-- `uv run just commit`: Commit changes to your repository.
-- `uv run just doc`: Generate API documentation.
-- `uv run just docker`: Build and run your Docker image.
-- `uv run just format`: Format your code with Ruff.
-- `uv run just install`: Install dependencies, pre-commit hooks, and GitHub rulesets.
-- `uv run just package`: Build your Python package.
-- `uv run just project`: Run the project in the CLI.
+## Usage
+
+```bash
+# Transcribe with all 3 models
+proto-transcription transcribe podcast.mp3 --output-dir ./output
+
+# Use specific models only
+proto-transcription transcribe podcast.mp3 -m faster-whisper,whisperx
+
+# Choose model size (tiny, base, small, medium, large)
+proto-transcription transcribe podcast.mp3 --model-size small
+
+# Verbose output
+proto-transcription transcribe podcast.mp3 --verbose
+```
+
+Each model writes a separate output file: `output/{audio_stem}_{model}_{size}.txt` with a metadata header and timestamped segments.
+
+## Development
+
+```bash
+just check          # run all checks (lint, type, security, coverage)
+just check-test     # run pytest only
+just format         # format with Ruff
+just doc            # generate API docs
+```
+
+## Architecture
+
+```
+src/proto_transcription/
+├── scripts.py              # Click CLI entry point
+├── config.py               # Configuration validation
+├── exceptions.py           # Exception hierarchy
+├── audio/converter.py      # FFmpeg wrapper — converts to 16kHz mono WAV
+├── output/writer.py        # Writes timestamped transcription files
+└── transcription/
+    ├── base.py             # BaseTranscriber abstract interface
+    ├── faster_whisper.py   # CTranslate2 backend, CPU + int8
+    ├── whisperx.py         # Adds phoneme alignment pass, CPU + int8
+    └── transformers.py     # HuggingFace pipeline, MPS on Apple Silicon
+```
+
+## Next Steps
+
+### 1. Web UI
+
+The CLI is a solid foundation — the next step is wrapping it in an interactive UI so you can upload audio, kick off transcription, and browse results without touching the terminal.
+
+**FastAPI is the right choice for the backend**, but it's not a UI on its own — it's a Python framework for building HTTP APIs. The typical approach is:
+
+- **FastAPI** handles the backend: accepts audio file uploads, runs transcription (async or as background tasks), and returns results as JSON
+- **A frontend** renders the UI: for a quick internal tool, [Streamlit](https://streamlit.io/) or [Gradio](https://gradio.app/) are pure-Python options that need no separate frontend code. For a more polished product, a React/Vue frontend calling the FastAPI endpoints is the standard pattern.
+
+The project already includes a `fastapi` dependency group (`uv sync --group fastapi`) and a `src/fastapi_app/` stub — it's ready to build on.
+
+### 2. Model Evaluation
+
+Running all three models on the same audio is a good start — the next step is measuring them systematically.
+
+#### Metrics
+
+The standard metric for transcription quality is **Word Error Rate (WER)**:
+
+```
+WER = (Substitutions + Deletions + Insertions) / Total words in reference
+```
+
+Lower is better; 0% is a perfect transcript. A related metric is **Character Error Rate (CER)**, which operates at the character level and is more sensitive to spelling errors and languages without clear word boundaries.
+
+Both require a **reference transcript** (ground truth) to compare against.
+
+#### Evaluation Approach
+
+1. **Collect a test set** — a handful of audio clips with known, manually-verified transcripts covering different speakers, accents, recording conditions, and topics
+2. **Run all three models** on each clip and record:
+   - **WER / CER** (via a library like [`jiwer`](https://github.com/jitsi/jiwer))
+   - **Latency** — wall-clock time for `load_model()` and `transcribe()` separately (model loading is a one-time cost; transcription time scales with audio length, so report it as real-time factor: `transcription_time / audio_duration`)
+   - **Memory usage** — peak RAM during inference
+3. **Compare outputs qualitatively** — WER misses nuances like punctuation, readability, and how well timestamps align with actual speech
+
+#### Libraries
+
+- [`jiwer`](https://github.com/jitsi/jiwer) — simple WER/CER computation in Python
+- [`evaluate`](https://huggingface.co/docs/evaluate) (HuggingFace) — broader suite including WER, supports batch evaluation
+- Standard test datasets: [LibriSpeech](https://www.openslr.org/12) (English audiobooks, widely used benchmark), [Common Voice](https://commonvoice.mozilla.org/) (diverse accents/languages)

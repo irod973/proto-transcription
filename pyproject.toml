@@ -13,6 +13,7 @@ license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "loguru>=0.7.3",
+    "click>=8.1.8",
 ]
 
 # LINKS
@@ -51,6 +52,14 @@ dev =[
 ]
 doc = ["pdoc>=15.0.1"]
 
+
+transcription = [
+    "faster-whisper>=1.1.0",
+    "whisperx>=3.1.6",
+    "transformers>=4.50.0",
+    "torch>=2.5.0",
+    "torchaudio>=2.5.0,<2.9",
+]
 
 fastapi = [
     "fastapi[standard]>=0.123.10",

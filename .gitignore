@@ -1,4 +1,10 @@
 # https://git-scm.com/docs/gitignore
+**/data/**
+**/output/**
+
+# Claude
+.claude/settings.local.json
+.claude/personal
 
 # Build
 /dist/
