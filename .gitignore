@@ -3,6 +3,7 @@
 **/output/**
 
 # Claude
+.claude/settings.local.json
 .claude/personal
 
 # Build
